@@ -3,7 +3,7 @@ MODEL small
 STACK 100h
 DATASEG
 	PlayerMsg db ? ;A buffer for a string given by the user
-	message db 130 dup (?)
+	message db 192 dup (?)
 	base64Alphabet db 64 dup (?)
 	encodedString db 256 dup (?)
 CODESEG
@@ -74,7 +74,55 @@ endp createBase64Alphabet
 
 
 
-
+proc encodeBase64
+	;encode the string stored in message and put the encoded version in encodedString
+	;loop on every 3 bytes and send them to encode3BytesBase64, then for the last 3 (if not 3) encode manually
+	;10,13,'$' will be appended to the message
+	
+	mov bl, [byte ptr message+1] ;total characters in message
+	
+	mov al, bl
+	xor ah, ah
+	mov bh, 3
+	div bh ;ah is the remaining bytes (if there are not 3)
+	
+	cmp ah, 0
+	je noExtraBytes
+	
+	dec al
+noExtraBytes:
+	;now loop for al times (number of 3 consistant bytes)
+	;stop at al
+	
+	xor si, si ;index of the message
+	xor dh, dh ;index of encodedString
+encodeBase64Loop:
+	
+	
+	mov ah, [byte ptr message+si]
+	inc si
+	mov al, [byte ptr message+si]
+	inc si
+	push ax
+	
+	;index is dh
+	mov dl, [byte ptr message+si]
+	inc si
+	
+	push dx
+	
+	add dh, 4
+	
+	cmp dh, al
+	jl encodeBase64Loop
+	
+	;end loop
+	
+	
+	
+	
+	
+endp encodeBase64
 
 
 
@@ -173,22 +221,6 @@ proc encode3BytesBase64
 	pop bp
 	ret 4
 endp encode3BytesBase64
-
-
-
-
-
-proc encodeEndBase64
-	;encodes the last 3 digits of the message
-	;get the first 2 characters in the top word in the stack and the index and last char at the bottom, where the index is at the high segment
-	push bp
-	mov bp, sp
-	
-	mov ax, [bp+4] ;index and last char
-	mov bx, [bp+6] ;2 chars
-	
-	mov di, ah ;index
-endp encodeEndBase64
 
 
 
