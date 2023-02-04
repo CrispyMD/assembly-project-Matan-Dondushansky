@@ -5,7 +5,7 @@ DATASEG
 	PlayerMsg db ? ;A buffer for a string given by the user
 	;message db 192 dup (?)
 	
-	message db 'MENON'
+	message db 17,10,'helloworld'
 	
 	base64Alphabet db 64 dup (?)
 	encodedString db 256 dup (?)
@@ -37,7 +37,7 @@ CapitalLetterLoop:
 	inc si
 	
 	cmp al,ah
-	ja CapitalLetterLoop
+	jbe CapitalLetterLoop
 	
 	;add lowercase letters
 	mov al, 'a' ;97
@@ -59,11 +59,10 @@ NumberLoop:
 	mov [byte ptr base64Alphabet+si], al
 	inc al
 	inc si
-	cmp ah, al
+	cmp al, ah
 	jbe NumberLoop
 	
 	;add + and /
-	inc si
 	mov [base64Alphabet+si], '+' ;43
 	inc si
 	mov [base64Alphabet+si], '/' ;47
@@ -81,6 +80,145 @@ proc encodeBase64
 	;encode the string stored in message and put the encoded version in encodedString
 	;loop on every 3 bytes and send them to encode3BytesBase64, then for the last 3 (if not 3) encode manually
 	;10,13,'$' will be appended to the message
+
+	ret
+endp encodeBase64
+
+
+
+
+
+proc encode3BytesBase64
+	;get 3 bytes from the stack, first word is 2 first bytes and the third one is the index in the string and the other byte
+	;put in the right index in encodedString the encoded 3 bytes (4 characters, 24 bits)
+	;assume that all chars are full so you don't have to complete the last one
+	
+	
+	;first put the 6 bits into encodedString, then shift into that register the second character, do it for 3 and 4 too.
+	
+	push bp
+	mov bp, sp
+	
+	
+	push ax
+	push bx 
+	push cx
+	push dx
+	push si
+	push di
+	
+	mov ax, [bp+6] ;first 2 bytes
+	mov bx, [bp+4] ;bh: index, bl: byte
+	
+	mov dh, ah ;we'll do the calculations on dh
+	
+	and dh, 11111100b ;get first character
+	shr dh, 2 ;now dh is the encoded char
+	
+	mov cl, bh
+	xor ch, ch
+	mov si, cx
+	;now si is the index
+	mov dl, dh
+	xor dh, dh
+	;dl is the 6 bits to encode
+	mov di, dx
+	mov dh, [byte ptr base64Alphabet+di] ;dh is the actual character
+	mov [byte ptr encodedString+si], dh
+	
+	
+	;finished first character
+	mov dh, ah
+	and dh, 00000011b
+	shl dh, 4
+	;dh has the first 2 bits of the second byte
+	
+	
+	mov dl, al ;byte 2
+	shr dl, 4
+	and dl, 00001111b
+	add dh, dl ;dh is now the second encoded byte
+	
+	
+	inc si;index
+	
+	mov dl, dh
+	xor dh, dh
+	
+	mov di, dx
+	mov dh, [byte ptr base64Alphabet+di] ;dh is the actual character
+	mov [byte ptr encodedString+si], dh
+
+	;finished second character
+	
+	mov dh, al
+	and dh, 00001111b ;get first 4 bits of third character
+	shl dh, 2 ;move the bits to their place
+	mov dl, bl
+	shr dl, 6 ;get the last 2 bits
+	
+	add dh, dl ;dh is the full character
+	
+	mov dl, dh
+	xor dh, dh
+	
+	mov di, dx
+	mov dh, [byte ptr base64Alphabet+di]
+	
+	inc si
+	
+	mov [byte ptr encodedString+si], dh
+	
+	;finished third character
+	
+	mov dh, bl
+	and dh, 00111111b ;dh is the last character
+	
+	mov dl, dh
+	xor dh, dh
+	
+	mov di, dx
+	
+	mov dh, [byte ptr base64Alphabet+di]
+	inc si
+	mov [byte ptr encodedString+si], dh
+	
+	;finished function
+	;cleanup
+	
+	pop di
+	pop si
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	pop bp
+	ret 4
+endp encode3BytesBase64
+
+
+
+
+start:
+	mov ax, @data
+	mov ds, ax
+	
+
+	call createBase64Alphabet
+	
+	
+	
+	
+	
+	
+	
+	;start encode
+	
+	
+	
+	
+	
+	
 	push ax
 	push bx
 	push cx
@@ -99,16 +237,23 @@ proc encodeBase64
 	mov bh, 3
 	div bh ;ah is the remaining bytes (if there are not 3)
 	
-	cmp ah, 0
-	je noExtraBytes
+	
+	
+	
+
 	
 	dec al
-noExtraBytes:
+
+
+
+
 	;now loop for al times (number of 3 consistant bytes)
 	;stop at al
 	
 	xor si, si ;index of the message
-	xor dh, dh ;index of encodedString
+	mov si, 2 ;start of message
+	xor dh, dh ;index of loop
+	xor bh, bh ;index of encodedString
 encodeBase64Loop:
 	
 	
@@ -118,18 +263,21 @@ encodeBase64Loop:
 	inc si
 	push cx
 	
-	;index is dh
-	mov dl, [byte ptr message+si]
+	;index is ch
+	mov bl, [byte ptr message+si]
 	inc si
 	
-	push dx
+	push bx
 	
+
 	call encode3BytesBase64
 	
-	add dh, 4
+	
+	add bh, 4
+	inc dh
 	
 	cmp dh, al
-	jl encodeBase64Loop
+	jle encodeBase64Loop
 	
 	
 	
@@ -140,8 +288,16 @@ encodeBase64Loop:
 	
 	
 	mov dl, dh
+	add dl, dl
+	add dl, dl
+
+	;mul by 4
 	xor dh, dh
 	mov di, dx
+	
+	
+	
+	
 	;di is encodedString index
 	;si is message index
 		
@@ -151,7 +307,7 @@ encodeBase64Loop:
 
 
 
-
+	
 	;encode first byte (exists no matter what)
 	
 	mov bl, [byte ptr message+si]
@@ -169,7 +325,7 @@ encodeBase64Loop:
 	;finished first byte
 	
 	
-	cmp ah, 1
+	cmp ah, 2
 	je bytesRemaining2Base64Encode
 	
 	;add last character and '==' for missing bytes
@@ -202,19 +358,25 @@ jmp endEncodeBase64
 
 endEncodeBase64pause:
 	cmp ah, 0
-	je endEncodeBase64pause ;if there are no more bytes to encode
+	je endEncodeBase64 ;if there are no more bytes to encode
 	
 	
 	
 
 ;case when 1 byte is missing
 bytesRemaining2Base64Encode:
-	
-	
+
+	dec si
 	mov bl, [byte ptr message+si]
+	inc si
+	and bl, 00000011b
+	shl bl, 4
+	mov bh, [byte ptr message+si]
+	inc si
+	shr bh, 4
 	
-	shr bl, 2
-	and bl, 00111111b
+	add bl, bh
+	
 	;bl is the right 6 bits
 	xor bh, bh
 	mov bl, [byte ptr base64Alphabet+bx]
@@ -224,17 +386,13 @@ bytesRemaining2Base64Encode:
 	
 	
 	;finished first byte
-	
+	dec si
 	mov bl, [byte ptr message+si]
 	inc si
 	
-	and bl, 00000011b
-	shl bl, 4
-	mov bh, [byte ptr message+si]
-	
-	and bh, 11110000b
-	shr bh, 4
-	add bl, bh
+	and bl, 00001111b
+	shl bl, 2
+	and bl, 00111100b
 	;bl is the full charcter
 	
 	xor bh, bh
@@ -245,16 +403,7 @@ bytesRemaining2Base64Encode:
 	
 	;finished second character
 	
-	mov bl, [byte ptr message+si]
-	and bl, 00001111b
-	shl bl, 2
-	and bl, 00111100b
-	
-	xor bh, bh
-	mov bl, [byte ptr base64Alphabet+bx]
-	;bl is the encoded character
-	mov [byte ptr encodedString+di], bl
-	inc di
+
 	
 	;now append '='
 	mov [byte ptr encodedString+di], '='
@@ -268,118 +417,22 @@ endEncodeBase64:
 	pop cx
 	pop bx
 	pop ax
-	ret
-endp encodeBase64
-
-
-
-
-
-proc encode3BytesBase64
-	;get 3 bytes from the stack, first word is 2 first bytes and the third one is the index in the string and the other byte
-	;put in the right index in encodedString the encoded 3 bytes (4 characters, 24 bits)
-	;assume that all chars are full so you don't have to complete the last one
 	
 	
-	;first put the 6 bits into encodedString, then shift into that register the second character, do it for 3 and 4 too.
-	
-	push bp
-	mov bp, sp
 	
 	
-	push ax
-	push bx 
-	push cx
-	push dx
-	push si
 	
 	
-	mov ax, [bp+6] ;first 2 bytes
-	mov bx, [bp+4] ;bh: index, bl: byte
-	
-	mov dh, ah ;we'll do the calculations on dh
-	
-	and dh, 11111100b ;get first character
-	shr dh, 2 ;now dh is the encoded char
-	
-	mov cl, bh
-	xor ch, ch
-	mov si, cx
-	;now si is the index
-	xor dl, dl
-	mov bx, dx
-	mov dh, [byte ptr base64Alphabet+bx] ;dh is the actual character
-	mov [byte ptr encodedString+si], dh
-	
-	;finished first character
-	mov dh, ah
-	shr dh, 6 
-	;dh has the first 2 bits of the second byte
 	
 	
-	mov dl, al ;byte 2
-	shr dl, 4
-	add dh, dl ;dh is now the second encoded byte
 	
 	
-	inc si;index
 	
-	xor dl, dl
-	mov bx, dx
-	mov dh, [byte ptr base64Alphabet+bx] ;dh is the actual character
-	mov [byte ptr encodedString+si], dh
-
-	;finished second character
 	
-	mov dh, ah
-	and dh, 00001111b ;get first 4 bits of third character
-	shl dh, 2 ;move the bits to their place
-	mov dl, bl
-	shr dl, 6 ;get the last 2 bits
 	
-	add dh, dl ;dh is the full character
 	
-	xor dl, dl
-	mov bx, dx
-	mov dh, [byte ptr base64Alphabet+bx]
 	
-	inc si
-	
-	mov [byte ptr encodedString+si], dh
-	
-	;finished third character
-	
-	mov dh, bl
-	and dh, 00111111b ;dh is the last character
-	xor dl, dl
-	mov bx, dx
-	
-	mov dh, [byte ptr base64Alphabet+bx]
-	inc si
-	mov [byte ptr encodedString+si], dh
-	
-	;finished function
-	;cleanup
-	
-	pop si
-	pop dx
-	pop cx
-	pop bx
-	pop ax
-	pop bp
-	ret 4
-endp encode3BytesBase64
-
-
-
-
-start:
-	mov ax, @data
-	mov ds, ax
-	
-
-	call createBase64Alphabet
-	call encodeBase64
+	;end encode
 	
 	
 	
