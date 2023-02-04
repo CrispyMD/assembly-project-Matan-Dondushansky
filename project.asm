@@ -3,7 +3,10 @@ MODEL small
 STACK 100h
 DATASEG
 	PlayerMsg db ? ;A buffer for a string given by the user
-	message db 192 dup (?)
+	;message db 192 dup (?)
+	
+	message db 'MENON'
+	
 	base64Alphabet db 64 dup (?)
 	encodedString db 256 dup (?)
 CODESEG
@@ -132,8 +135,8 @@ encodeBase64Loop:
 	
 	;end loop
 	
-	cmp sh, 0
-	je endEncodeBase64 ;if there are no more bytes to encode
+	cmp ah, 0
+	je endEncodeBase64pause ;if there are no more bytes to encode
 	
 	
 	mov dl, dh
@@ -160,7 +163,7 @@ encodeBase64Loop:
 	xor bh, bh
 	mov bl, [byte ptr base64Alphabet+bx]
 	;bl is the encoded character
-	mov [byte ptr encodedString+di], bx
+	mov [byte ptr encodedString+di], bl
 	inc di
 	
 	;finished first byte
@@ -181,7 +184,7 @@ encodeBase64Loop:
 	xor bh, bh
 	mov bl, [byte ptr base64Alphabet+bx]
 	
-	mov [byte ptr encodedString+di], bx
+	mov [byte ptr encodedString+di], bl
 	
 	;append 2 '=='
 	mov [byte ptr encodedString+di], '='
@@ -196,6 +199,14 @@ jmp endEncodeBase64
 
 
 
+
+endEncodeBase64pause:
+	cmp ah, 0
+	je endEncodeBase64pause ;if there are no more bytes to encode
+	
+	
+	
+
 ;case when 1 byte is missing
 bytesRemaining2Base64Encode:
 	
@@ -208,7 +219,7 @@ bytesRemaining2Base64Encode:
 	xor bh, bh
 	mov bl, [byte ptr base64Alphabet+bx]
 	;bl is the encoded character
-	mov [byte ptr encodedString+di], bx
+	mov [byte ptr encodedString+di], bl
 	inc di
 	
 	
@@ -229,7 +240,7 @@ bytesRemaining2Base64Encode:
 	xor bh, bh
 	mov bl, [byte ptr base64Alphabet+bx]
 	;bl is the encoded character
-	mov [byte ptr encodedString+di], bx
+	mov [byte ptr encodedString+di], bl
 	inc di
 	
 	;finished second character
@@ -242,7 +253,7 @@ bytesRemaining2Base64Encode:
 	xor bh, bh
 	mov bl, [byte ptr base64Alphabet+bx]
 	;bl is the encoded character
-	mov [byte ptr encodedString+di], bx
+	mov [byte ptr encodedString+di], bl
 	inc di
 	
 	;now append '='
@@ -272,7 +283,7 @@ proc encode3BytesBase64
 	
 	;first put the 6 bits into encodedString, then shift into that register the second character, do it for 3 and 4 too.
 	
-	push bp, sp
+	push bp
 	mov bp, sp
 	
 	
@@ -368,7 +379,7 @@ start:
 	
 
 	call createBase64Alphabet
-	
+	call encodeBase64
 	
 	
 	
