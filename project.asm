@@ -99,17 +99,19 @@ noExtraBytes:
 encodeBase64Loop:
 	
 	
-	mov ah, [byte ptr message+si]
+	mov ch, [byte ptr message+si]
 	inc si
-	mov al, [byte ptr message+si]
+	mov cl, [byte ptr message+si]
 	inc si
-	push ax
+	push cx
 	
 	;index is dh
 	mov dl, [byte ptr message+si]
 	inc si
 	
 	push dx
+	
+	call encode3BytesBase64
 	
 	add dh, 4
 	
@@ -118,11 +120,88 @@ encodeBase64Loop:
 	
 	;end loop
 	
+	;now encode last characters
+	
+	cmp ah, 0
+	je endEncodeBase64
+	
+	mov cl, ah ;cl is the remaining bytes
+	;add first character
+	mov al, [byte ptr message+si]
+	inc si ;si is the message index
+	shr al, 2
+	
+	xor ah, ah
+	mov di, ax
+	mov al, [byte ptr base64Alphabet+di] ;encoded character
+	
+	mov dl, dh
+	xor dh, dh
+	mov di, dx
+	mov [byte ptr encodedString+di], al
+	
+	inc dl ;now dl is the encodedString index
+	
+	;finished first character
+
+	
+	;we have 1 remaining character to encode
+	
+	mov al, [byte ptr message+si]
+	inc si
+	and al, 00000011b
+	shl al, 4
+	and al, 00110000b
+	
+	xor ah, ah
+	mov di, ax
+	mov al, [byte ptr base64Alphabet+di] ;al is the encoded character. now append it to encodedString
+	
+	xor dh, dh
+	mov di, dx
+	mov [byte ptr encodedString+di], al
+	inc di ;di is encodedString index
+	;si is the message index
+	
+	;finished second character
 	
 	
+	cmp cl, 1
+	jne bytesLeft2Base64Encoding ;jump if we need to add an additional character
+	
+	
+	;now append == to encodedString
+	mov cl, '='
+	mov [byte ptr encodedString+di], cl
+	inc di
+	
+	mov [byte ptr encodedString+di], cl
+	inc di
+	
+	jmp endEncodeBase64
+	;finished procedure for 1 last byte
+	
+
+
+bytesLeft2Base64Encoding:
+	;encode when there are 2 byte left
+	;bytes left to encode: 1
+	
+	
+	;di is encoded string index
+	;si is message index
+	
+	
+	
+	
+	
+	;ADD THE REST OF THE THE 3 BYTES ENCODING
+	
+endEncodeBase64:
 	
 	
 endp encodeBase64
+
 
 
 
