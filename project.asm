@@ -432,11 +432,11 @@ decodeBase64Loop:
 	
 	
 	;end loop
-	
+	xor cl, cl
 	cmp ah, 0
-	je endDecodeBase64
+	je endDecodeBase64Stop1
 	;if there are no characters left
-	
+	inc cl
 	
 	
 	;we've got 4 characters left in message
@@ -464,6 +464,7 @@ decodeBase64Loop:
 	;end function for ==
 	jmp endDecodeBase64
 	
+	
 Not2EqualSigns:
 	add si, 3
 	cmp [byte ptr message+si], '='
@@ -484,6 +485,16 @@ Not2EqualSigns:
 	
 	inc di
 	mov dl, [byte ptr message+si]
+	
+	
+	
+	endDecodeBase64Stop1:
+	cmp cl, 0
+	je endDecodeBase64Stop2
+	
+	
+	
+	
 	shl dl, 4
 	
 	inc si
@@ -495,6 +506,8 @@ Not2EqualSigns:
 	inc di
 	
 	jmp endDecodeBase64
+	
+
 	
 
 
@@ -512,6 +525,11 @@ not1EqualSign:
 	add dl, dh
 	;dl is the full byte
 	mov [byte ptr decodedMsg+di], dl
+	
+	
+endDecodeBase64Stop2:
+	cmp cl, 0
+	je endDecodeBase64
 	
 	inc di
 	mov dl, [byte ptr message+si]
