@@ -2,8 +2,36 @@ IDEAL
 MODEL small
 STACK 100h
 DATASEG
-	PlayerMsg db ? ;A buffer for a string given by the user
-	;message db 192 dup (?)
+	
+	
+	mainMenuTitle	db 10,10,'               Hello!',10,10,'               In this assembly project, you can encode',10,'               and decode strings through the base64'
+					db 'algorithm.',10,10
+					db '               Enjoy!',10,10,10,10,10,'$'
+					
+					
+	mainMenuNav	db '               ','Press E/e for encode',10,10,10
+				db '               ','Press D/d for decode',10,10,10
+				db '               ','Press I/i for an introduction to the algorithm','$'
+				
+				
+	IntroText	db 10,10,'               ','Introduction Page',10,10,10,10,10
+				db '               ','Press D/d for an explenation about the decode algorithm',10,10,10
+				db '               ','Press E/e for an explenation about the encode algorithm',10,10,10
+				db '               ','Press M/m to go back to the Main Menu','$'
+				
+	IntroEncodeText	db 10,10,'               ','Given a String of characters in the base64 alphabet,',10
+					db '               ','ABCDEFGHIJKLMNOPQRSTUVWXYZ',10
+					db '               ','abcdefghijklmnopqrstuvwxyz0123456789+/',10
+					db '               ','We will encode it as follows:',10,10,10
+					db '               ','1. Split the stream of bits to chunks of 6 bits each.',10,10
+					db '               ','2. For every block, with binary value 63 at max,',10
+					db '               ','convert it to its index at the alphabet. so for each 3 bytes,',10
+					db '               ','4 characters will be the output.',10,10
+					db '               ','3. At the end, if there is 1 or 2 bytes left,',10
+					db '               ','we have 16 or 8 bits remaining. So, and 0s at their end ',10
+					db '               ','to complete them to 6 bit blocks.',10,10
+					db '               ','4. For each byte missing at the end, append an =.',10,10,10,10
+					db '               ','Press I/i to go back to the introduction Page.','$'
 	
 	message db 16,8,'aGVsbG8='
 	charIndex db ?
@@ -11,16 +39,8 @@ DATASEG
 	base64Alphabet db 64 dup (?)
 	encodedString db 256 dup (?)
 	decodedMsg db 256 dup (?)
-CODESEG
-
-	;write a function that takes a combintaion of characters from the user
-proc getStringFromUser
-		;put first character in PlayerMsg second position and go forward.
-		;First position will be the length of the message including the enter and break (10,13,'$')
-		;we are doing this to make sure the user isn't putting more than 255 characters in the message
 	
-		;run until we get enter or get to 189 characters
-endp getStringFromUser
+CODESEG
 
 
 
@@ -386,175 +406,6 @@ proc decodeBase64
 
     ;for each four characters in decoded message, decode them into 3 bytes.
 
-	
-	
-	
-	ret
-endp decodeBase64
-
-
-
-proc decode3BytesBase64
-    ;get index in decodedMsg via stack (the low part), and an index in message (the high part)
-    ;every byte in message is a byte with 00 at it's start
-	
-	
-	push bp
-    mov bp, sp
-
-    push ax
-    push bx
-    push si
-    push di
-
-    mov ax, [bp+4]
-    mov bl, ah
-    xor bh, bh
-    mov si, bx
-
-    xor ah, ah
-    mov di, ax
-    ;si is index in message
-    ;di is index in decodedMsg
-
-    ;now we'll decode the first byte
-   
-    mov al, [byte ptr message+si]
-	inc si
-	xor ah, ah
-
-	push ax
-	call redoCharArrayBase64
-	
-	mov al, [charIndex] ;al is the first bits of the first byte
-	shl al, 2
-	
-	
-	mov bl, [byte ptr message+si]
-	xor bh, bh
-	
-	push bx
-	call redoCharArrayBase64
-	
-	mov bl, [charIndex]
-	shr bl, 4
-	
-	add al, bl
-	mov [byte ptr decodedMsg+di], al
-	inc di
-	
-	;finished first byte
-	
-	mov al, [byte ptr message+si]
-	inc si
-	xor ah, ah
-	push ax
-	call redoCharArrayBase64
-	
-	mov al, [charIndex]
-	shl al, 4
-	mov bl, [byte ptr message+si]
-	xor bh, bh
-	push bx
-	call redoCharArrayBase64
-	
-	mov bl, [charIndex]
-	shr bl, 2
-	and bl, 00001111b
-	add al, bl
-	mov [byte ptr decodedMsg+di], al
-	inc di
-	
-	;finished second byte
-	
-	mov al, [byte ptr message+si]
-	inc si
-	xor ah, ah
-	push ax
-	call redoCharArrayBase64
-	
-	mov al, [charIndex]
-	shl al, 6
-	mov bl, [byte ptr message+si]
-	xor bh, bh
-	push bx
-	call redoCharArrayBase64
-	
-	mov bl, [charIndex]
-	add al, bl
-	mov [byte ptr decodedMsg+di], al
-	
-	;finished third byte
-    ;cleanup
-
-    pop di
-    pop si
-    pop bx
-    pop ax
-    pop bp
-	
-
-
-    ret 2
-endp decode3BytesBase64
-
-
-
-proc redoCharArrayBase64
-    ;get a byte from the stack (low part) and return its index in base64Alphabet
-    ;charIndex variable is a byte and we'll put in it the index
-
-	push bp
-    mov bp, sp
-
-    push si
-    push ax
-
-
-    mov ax, [bp + 4]
-    ;al is the byte to find it's index
-    xor si, si ;index in base64Alphabet
-
-redoCharArrayBase64Loop:
-
-    cmp al, [byte ptr base64Alphabet+si]
-    je rightIndex
-
-    inc si
-    jmp redoCharArrayBase64Loop
-
-rightIndex:
-    ;end loop
-
-    mov ax, si
-    mov [charIndex], al
-
-    ;cleanup
-
-    pop ax
-    pop si
-    pop bp
-
-    ret 2
-endp redoCharArrayBase64
-
-
-
-
-start:
-	mov ax, @data
-	mov ds, ax
-	
-
-	call createBase64Alphabet
-	
-	
-	
-	;decodeBase64
-	
-	
-	
-	
 	push ax
 	push bx
 	push cx
@@ -826,6 +677,256 @@ endDecodeBase64:
 	pop ax
 	
 	
+	ret
+endp decodeBase64
+
+
+
+proc decode3BytesBase64
+    ;get index in decodedMsg via stack (the low part), and an index in message (the high part)
+    ;every byte in message is a byte with 00 at it's start
+	
+	
+	push bp
+    mov bp, sp
+
+    push ax
+    push bx
+    push si
+    push di
+
+    mov ax, [bp+4]
+    mov bl, ah
+    xor bh, bh
+    mov si, bx
+
+    xor ah, ah
+    mov di, ax
+    ;si is index in message
+    ;di is index in decodedMsg
+
+    ;now we'll decode the first byte
+   
+    mov al, [byte ptr message+si]
+	inc si
+	xor ah, ah
+
+	push ax
+	call redoCharArrayBase64
+	
+	mov al, [charIndex] ;al is the first bits of the first byte
+	shl al, 2
+	
+	
+	mov bl, [byte ptr message+si]
+	xor bh, bh
+	
+	push bx
+	call redoCharArrayBase64
+	
+	mov bl, [charIndex]
+	shr bl, 4
+	
+	add al, bl
+	mov [byte ptr decodedMsg+di], al
+	inc di
+	
+	;finished first byte
+	
+	mov al, [byte ptr message+si]
+	inc si
+	xor ah, ah
+	push ax
+	call redoCharArrayBase64
+	
+	mov al, [charIndex]
+	shl al, 4
+	mov bl, [byte ptr message+si]
+	xor bh, bh
+	push bx
+	call redoCharArrayBase64
+	
+	mov bl, [charIndex]
+	shr bl, 2
+	and bl, 00001111b
+	add al, bl
+	mov [byte ptr decodedMsg+di], al
+	inc di
+	
+	;finished second byte
+	
+	mov al, [byte ptr message+si]
+	inc si
+	xor ah, ah
+	push ax
+	call redoCharArrayBase64
+	
+	mov al, [charIndex]
+	shl al, 6
+	mov bl, [byte ptr message+si]
+	xor bh, bh
+	push bx
+	call redoCharArrayBase64
+	
+	mov bl, [charIndex]
+	add al, bl
+	mov [byte ptr decodedMsg+di], al
+	
+	;finished third byte
+    ;cleanup
+
+    pop di
+    pop si
+    pop bx
+    pop ax
+    pop bp
+	
+
+
+    ret 2
+endp decode3BytesBase64
+
+
+
+proc redoCharArrayBase64
+    ;get a byte from the stack (low part) and return its index in base64Alphabet
+    ;charIndex variable is a byte and we'll put in it the index
+
+	push bp
+    mov bp, sp
+
+    push si
+    push ax
+
+
+    mov ax, [bp + 4]
+    ;al is the byte to find it's index
+    xor si, si ;index in base64Alphabet
+
+redoCharArrayBase64Loop:
+
+    cmp al, [byte ptr base64Alphabet+si]
+    je rightIndex
+
+    inc si
+    jmp redoCharArrayBase64Loop
+
+rightIndex:
+    ;end loop
+
+    mov ax, si
+    mov [charIndex], al
+
+    ;cleanup
+
+    pop ax
+    pop si
+    pop bp
+
+    ret 2
+endp redoCharArrayBase64
+
+
+
+
+start:
+	mov ax, @data
+	mov ds, ax
+	
+
+	call createBase64Alphabet
+	
+	mov ah, 0 ;text mode
+	mov al, 2
+	int 10h
+	;Initialize program
+	
+	
+	
+	;Main Menu
+	
+	;print main menu
+	mov ah, 9
+	mov dx, offset mainMenuTitle
+	int 21h
+	
+	
+	mov ah, 9
+	mov dx, offset mainMenuNav
+	int 21h
+	
+	
+	
+MainMenuLoop:
+	
+	;check for I D or E
+	
+	mov ah, 0h
+	int 16h
+	
+	cmp al, 'I'
+	je InrtoMenu
+	cmp al, 'i'
+	je InrtoMenu
+	
+	
+	cmp al, 'E'
+	je EncodeMenu
+	cmp al, 'e'
+	je EncodeMenu
+	
+	cmp al, 'D'
+	je DecodeMenu
+	cmp al, 'd'
+	je DecodeMenu
+	
+	jmp MainMenuLoop
+	
+	
+	
+InrtoMenu:
+
+	mov ax, 3
+	int 10h
+	
+	mov ah, 9
+	mov dx, offset IntroText
+	int 21h
+	
+IntroMenuLoop:
+
+	mov ah, 0h
+	int 16h
+	
+	cmp al, 'e'
+	je IntroEncode
+	
+	cmp al, 'E'
+	je IntroEncode
+	
+	jmp IntroMenuLoop
+	
+	
+IntroEncode:
+	mov ax, 3
+	int 10h
+	
+	mov ah, 9
+	mov dx, offset IntroEncodeText
+	int 21h
+
+IntroEncodeLoop:
+
+	mov ah, 0h
+	int 16h
+	
+	
+	cmp al, 'I'
+	je InrtoMenu
+	cmp al, 'i'
+	je InrtoMenu
+	
+	jmp IntroEncodeLoop
 	
 	
 	
@@ -838,6 +939,11 @@ endDecodeBase64:
 	
 	
 	
+
+
+EncodeMenu:
+
+DecodeMenu:
 	
 	
 	
