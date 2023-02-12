@@ -19,6 +19,7 @@ DATASEG
 				db '               ','Press E/e for an explenation about the encode algorithm',10,10,10
 				db '               ','Press M/m to go back to the Main Menu','$'
 				
+				
 	IntroEncodeText	db 10,10,'               ','Given a String of characters in the base64 alphabet,',10
 					db '               ','ABCDEFGHIJKLMNOPQRSTUVWXYZ',10
 					db '               ','abcdefghijklmnopqrstuvwxyz0123456789+/',10
@@ -28,12 +29,38 @@ DATASEG
 					db '               ','convert it to its index at the alphabet. so for each 3 bytes,',10
 					db '               ','4 characters will be the output.',10,10
 					db '               ','3. At the end, if there is 1 or 2 bytes left,',10
-					db '               ','we have 16 or 8 bits remaining. So, and 0s at their end ',10
+					db '               ','we have 16 or 8 bits remaining. So, add 0s at their end ',10
 					db '               ','to complete them to 6 bit blocks.',10,10
 					db '               ','4. For each byte missing at the end, append an =.',10,10,10,10
 					db '               ','Press I/i to go back to the introduction Page.','$'
-	
-	message db 16,8,'aGVsbG8='
+					
+					
+	IntroDecodeText db 10,10,'               ','Given a String of characters, decode it as follows:',10,10,10
+					db '               ','1. Divide the stream into 4 character long blocks.',10,10
+					db '               ','2. For each block, revert its characters back through',10
+					db '               ','the alphabet, and then weve got a stream of 24 bits.',10,10
+					db '               ','3. Each 8 bit sequence is our encoded letter.',10,10
+					db '               ','4. At the last block, if there 1 or 2 =,',10
+					db '               ','decode 3 minus the number of =',10,10,10,10
+					db '               ','Press I/i to go back to the introduction Page.','$'
+					
+					
+	DecodeText 	db 10,10,'               ','Write a string you will like to decode (max 56 characters)',10,10
+				db '               ','Each character not in the alphabet will not be registered.',10,10
+				db '               ','Press Enter to submit string and backspace to delete a char',10,10
+				db '               ','Press ! to go back to the main menu',10,10,10,10,'$'
+				
+				
+	InvalidStringDecodeText	db 10,10,'               ','You submitted an invalid String.',10,10
+							db '               ','Try to write a valid string next time :)',10,10,10,10
+							db '               ','Press M/m to go back to the Main Menu',10,10
+							db '               ','Press D/d to resubmit a string','$'
+							
+							
+							
+							
+							
+	message db 59 dup (?) ;last char is $
 	charIndex db ?
 	
 	base64Alphabet db 64 dup (?)
@@ -522,7 +549,7 @@ not1IterationDecode2:
 	mov [byte ptr decodedMsg+di], dl
 	inc di
 	
-	dec di
+
 	dec si
 	;end function for ==
 	jmp endDecodeBase64
@@ -663,11 +690,13 @@ endDecodeBase64Stop3:
 	and bl, 00111111b
 	add dl, bl
 	mov [byte ptr decodedMsg+di], dl
+	inc di
 	
 
 	
 	;cleanup
 endDecodeBase64:
+	mov [byte ptr decodedMsg+di], '$'
 	
 	pop di
 	pop si
@@ -828,6 +857,84 @@ endp redoCharArrayBase64
 
 
 
+proc checkInAlphabet
+	;get a char via stack (low part) and make ah 1 if it is in base64Alphabet and 0 if it's not
+	
+	push bp
+	mov bp, sp
+	push si
+	push ax
+	
+	mov al, [bp + 4]
+	xor si,si
+
+checkInAlphabetLoop:
+	cmp [byte ptr base64Alphabet+si], al
+	je FoundCharInAlphabet
+	
+	inc si
+	cmp si, 64
+	jne checkInAlphabetLoop
+	
+	pop ax
+	xor ah, ah
+	jmp endCheckInAlphabet
+
+FoundCharInAlphabet:
+	pop ax
+	mov ah, 1
+
+endCheckInAlphabet:
+	pop si
+	pop bp
+	ret 2
+endp checkInAlphabet
+
+
+
+proc checkValidDecode
+	;checks if the message in decodedMsg contains chars not in base64Alphabet
+	;if its invalid put 0 in cl and if it is put 1
+	;use checkInAlphabet
+	push si
+	push dx
+	push ax
+	
+	xor si, si
+	xor dh, dh
+	;si is the index in decodedMsg
+	
+checkValidDecodeLoop:
+
+	mov dl, [byte ptr decodedMsg+si]
+	
+	push dx
+	call checkInAlphabet
+	
+	cmp ah, 0
+	jne ValidCharDecodeFunc
+	
+	;invalid char
+	xor cl, cl
+	jmp endCheckValidDecodeLoop
+	
+ValidCharDecodeFunc:
+	inc si
+	cmp [byte ptr decodedMsg+si], '$'
+	jne checkValidDecodeLoop
+	
+	mov cl, 1
+	
+endCheckValidDecodeLoop:
+	pop ax
+	pop dx
+	pop si
+	
+	ret
+endp checkValidDecode
+
+
+
 
 start:
 	mov ax, @data
@@ -836,14 +943,19 @@ start:
 
 	call createBase64Alphabet
 	
-	mov ah, 0 ;text mode
-	mov al, 2
-	int 10h
+	
+	
 	;Initialize program
 	
 	
 	
 	;Main Menu
+MainMenu:
+	xor ch, ch
+	
+	mov ah, 0 ;text mode
+	mov al, 2
+	int 10h
 	
 	;print main menu
 	mov ah, 9
@@ -883,6 +995,11 @@ MainMenuLoop:
 	jmp MainMenuLoop
 	
 	
+MainMenuStop1:
+	cmp ch, 1
+	je MainMenu
+	
+	
 	
 InrtoMenu:
 
@@ -898,11 +1015,24 @@ IntroMenuLoop:
 	mov ah, 0h
 	int 16h
 	
+	
+	cmp al, 'd'
+	je IntroDecode
+	
+	cmp al, 'D'
+	je IntroDecode
+	
 	cmp al, 'e'
 	je IntroEncode
 	
 	cmp al, 'E'
 	je IntroEncode
+	
+	cmp al, 'M'
+	je MainMenu
+	
+	cmp al, 'm'
+	je MainMenu
 	
 	jmp IntroMenuLoop
 	
@@ -930,13 +1060,34 @@ IntroEncodeLoop:
 	
 	
 	
+IntroDecode:
+	mov ax, 3
+	int 10h
+	
+	mov ah, 9
+	mov dx, offset IntroDecodeText
+	int 21h
+	
+	
+IntroDecodeLoop:
+	mov ah, 0h
+	int 16h
+	
+	
+	cmp al, 'I'
+	je InrtoMenu
+	cmp al, 'i'
+	je InrtoMenu
+	
+	jmp IntroDecodeLoop
 	
 	
 	
 	
 	
-	
-	
+MainMenuStop2:
+	cmp ch, 1
+	je MainMenuStop1
 	
 	
 
@@ -945,8 +1096,103 @@ EncodeMenu:
 
 DecodeMenu:
 	
+	mov si, 2
+	;si is the index in message
+	mov dl, [byte ptr message+1]
+	xor [byte ptr message+1], dl
+	
+	mov [byte ptr message], 56
+DecodeMenuLoop:
+
+	mov ah, 0h
+	int 16h
+	
+	cmp al, '!'
+	jne GoToMain1
+	
+	mov ch, 1
+	jmp MainMenuStop2
+	
+GoToMain1:
+	
+	xor ah, ah
+	push ax
+	call checkInAlphabet
+	;if ah is 0 then avoid the char
+	cmp ah, 1
+	je ValidCharDecode
+	
+	;check for enter
+	
+	cmp al, 10 ;enter
+	je DecodeMessage
+	
+	;check for backspace
+
+	cmp al, 8
+	jne DecodeMenuLoop
+	
+	cmp si, 2
+	je DecodeMenuLoop
+	
+	dec si
+	dec [byte ptr message+1]
 	
 	
+	jmp DecodeMenuLoop
+	
+	
+	;char is valid
+
+notBsDecode:
+ValidCharDecode:
+	;if not backspace (8 in ascii)
+	cmp [byte ptr message+1], 56
+	je DecodeMenuLoop
+
+	inc [byte ptr message+1]
+	mov [byte ptr message+si], al
+	inc si
+	
+	jmp DecodeMenuLoop
+	
+	
+MainMenuStop3:
+	cmp ch, 1
+	je MainMenuStop2
+	
+DecodeMessage:
+	
+	call decodeBase64
+	;check for exceptions
+	call checkValidDecode
+	cmp cl, 0
+	je InvalidStringDecode
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+InvalidStringDecode:
+	
+	mov ax, 3
+	int 10h
+	;clear screen
+	
+	
+	mov ah, 9
+	mov dx, offset InvalidStringDecodeText
+	int 21h
+	
+	mov ah, 0h
+	int 16h
+	
+	cmp al, 
 	
 	
 exit:
