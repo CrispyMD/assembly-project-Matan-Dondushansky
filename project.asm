@@ -5,7 +5,7 @@ DATASEG
 	PlayerMsg db ? ;A buffer for a string given by the user
 	;message db 192 dup (?)
 	
-	message db 17,8,'IMA SCHA'
+	message db 16,8,'aGVsbG8='
 	charIndex db ?
 	
 	base64Alphabet db 64 dup (?)
@@ -386,186 +386,7 @@ proc decodeBase64
 
     ;for each four characters in decoded message, decode them into 3 bytes.
 
-	push ax
-	push bx
-	push cx
-	push dx
-	push si
-	push di
-    
 	
-
-    ;loop on every 4 characters in message
-
-    mov al, [byte ptr message+1]
-	xor ah, ah
-    ;ax is the number of characters in message
-	
-	mov bl, 4
-	div bl
-	dec al
-	;iterate for al
-	
-	;si is index in message (the message to decode)
-	;di is index in decodedMsg
-	xor si, si
-	add si, 2
-	xor di, di
-	
-decodeBase64Loop:
-	mov bx, di
-	mov cx, si
-	mov bh, cl
-	
-	
-	push bx
-	
-	call decode3BytesBase64
-	
-	add di, 3
-	add si, 4
-
-	
-	dec al
-	cmp al, 0
-	jne decodeBase64Loop
-	
-	
-	;end loop
-	xor cl, cl
-	cmp ah, 0
-	je endDecodeBase64Stop1
-	;if there are no characters left
-	inc cl
-	
-	
-	;we've got 4 characters left in message
-	
-	add si, 2
-	cmp [byte ptr message+si], '='
-	
-	jne Not2EqualSigns
-	
-	;we've got == at the end
-	
-	sub si, 2
-	mov dl, [byte ptr message+si]
-	shl dl, 2
-	inc si
-	mov dh, [byte ptr message+si]
-	and dh, 00110000b
-	shr dh, 4
-	add dl, dh
-	;dl is the full byte
-	mov [byte ptr decodedMsg+di], dl
-	
-	dec di
-	dec si
-	;end function for ==
-	jmp endDecodeBase64
-	
-	
-Not2EqualSigns:
-	add si, 3
-	cmp [byte ptr message+si], '='
-	jne not1EqualSign
-	
-	;we've got = at the end so 2 bytes to decode
-	
-	sub si, 3
-	mov dl, [byte ptr message+si]
-	shl dl, 2
-	inc si
-	mov dh, [byte ptr message+si]
-	and dh, 00110000b
-	shr dh, 4
-	add dl, dh
-	;dl is the full byte
-	mov [byte ptr decodedMsg+di], dl
-	
-	inc di
-	mov dl, [byte ptr message+si]
-	
-	
-	
-	endDecodeBase64Stop1:
-	cmp cl, 0
-	je endDecodeBase64Stop2
-	
-	
-	
-	
-	shl dl, 4
-	
-	inc si
-	mov dh, [byte ptr message+si]
-	and dh, 00111100b
-	shr dh, 4
-	add dl, dh
-	mov [byte ptr decodedMsg+di], dl
-	inc di
-	
-	jmp endDecodeBase64
-	
-
-	
-
-
-
-not1EqualSign:
-	;we've got no = at the end so 3 bytes to decode
-	
-	sub si, 3
-	mov dl, [byte ptr message+si]
-	shl dl, 2
-	inc si
-	mov dh, [byte ptr message+si]
-	and dh, 00110000b
-	shr dh, 4
-	add dl, dh
-	;dl is the full byte
-	mov [byte ptr decodedMsg+di], dl
-	
-	
-endDecodeBase64Stop2:
-	cmp cl, 0
-	je endDecodeBase64
-	
-	inc di
-	mov dl, [byte ptr message+si]
-	shl dl, 4
-	
-	inc si
-	mov dh, [byte ptr message+si]
-	and dh, 00111100b
-	shr dh, 4
-	add dl, dh
-	mov [byte ptr decodedMsg+di], dl
-	inc di
-	
-	mov dl, [byte ptr message+si]
-	and dl, 00000011b
-	shl dl, 6
-	
-	inc si
-	mov dh, [byte ptr message + si]
-	and dh, 00111111b
-	add dl, dh
-	
-	mov [byte ptr message+di], dl
-	
-	
-	
-	
-	;cleanup
-endDecodeBase64:
-	
-	pop di
-	pop si
-	pop dx
-	pop cx
-	pop bx
-	pop ax
 	
 	
 	ret
@@ -576,8 +397,9 @@ endp decodeBase64
 proc decode3BytesBase64
     ;get index in decodedMsg via stack (the low part), and an index in message (the high part)
     ;every byte in message is a byte with 00 at it's start
-
-    push bp
+	
+	
+	push bp
     mov bp, sp
 
     push ax
@@ -597,59 +419,72 @@ proc decode3BytesBase64
 
     ;now we'll decode the first byte
    
-    mov al, [byte ptr message + si]
-    shl al, 2
-    mov ah, [byte ptr message + si + 1]
-    inc si
-    shr ah, 4
-    add al, ah
-    ;al is the byte to move through base64Alphabet
+    mov al, [byte ptr message+si]
+	inc si
+	xor ah, ah
 
-    xor ah, ah
-    push ax
-    call redoCharArrayBase64
-    ;charIndex is the encoded first byte
-
-    mov al, [byte ptr charIndex]
-    mov [byte ptr decodedMsg + di], al
-    inc di
-
-    ;finshed first byte
-
-
-
-    mov al, [byte ptr message + si]
-    shl al, 4
-    mov ah, [byte ptr message + si + 1]
-    inc si
-    shr ah, 2
-    add al, ah
-    ;al is the byte to encode
-
-    xor ah, ah
-    push ax
-    call redoCharArrayBase64
-    mov al, [byte ptr charIndex]
-    mov [byte ptr decodedMsg+di], al
-    inc di
-
-    ;finished second byte
-
-
-
-    mov al, [byte ptr message + si]
-    shl al, 6
-
-    mov ah, [byte ptr message + si + 1]
-    add al, ah
-    ;al is the full byte to decode
-
-    xor ah, ah
-    push ax
-    call redoCharArrayBase64
-    mov al, [byte ptr charIndex]
-    mov [byte ptr decodedMsg + di], al
-
+	push ax
+	call redoCharArrayBase64
+	
+	mov al, [charIndex] ;al is the first bits of the first byte
+	shl al, 2
+	
+	
+	mov bl, [byte ptr message+si]
+	xor bh, bh
+	
+	push bx
+	call redoCharArrayBase64
+	
+	mov bl, [charIndex]
+	shr bl, 4
+	
+	add al, bl
+	mov [byte ptr decodedMsg+di], al
+	inc di
+	
+	;finished first byte
+	
+	mov al, [byte ptr message+si]
+	inc si
+	xor ah, ah
+	push ax
+	call redoCharArrayBase64
+	
+	mov al, [charIndex]
+	shl al, 4
+	mov bl, [byte ptr message+si]
+	xor bh, bh
+	push bx
+	call redoCharArrayBase64
+	
+	mov bl, [charIndex]
+	shr bl, 2
+	and bl, 00001111b
+	add al, bl
+	mov [byte ptr decodedMsg+di], al
+	inc di
+	
+	;finished second byte
+	
+	mov al, [byte ptr message+si]
+	inc si
+	xor ah, ah
+	push ax
+	call redoCharArrayBase64
+	
+	mov al, [charIndex]
+	shl al, 6
+	mov bl, [byte ptr message+si]
+	xor bh, bh
+	push bx
+	call redoCharArrayBase64
+	
+	mov bl, [charIndex]
+	add al, bl
+	mov [byte ptr decodedMsg+di], al
+	
+	;finished third byte
     ;cleanup
 
     pop di
@@ -657,6 +492,8 @@ proc decode3BytesBase64
     pop bx
     pop ax
     pop bp
+	
+
 
     ret 2
 endp decode3BytesBase64
@@ -667,7 +504,7 @@ proc redoCharArrayBase64
     ;get a byte from the stack (low part) and return its index in base64Alphabet
     ;charIndex variable is a byte and we'll put in it the index
 
-    push bp
+	push bp
     mov bp, sp
 
     push si
@@ -711,9 +548,298 @@ start:
 
 	call createBase64Alphabet
 	
-	call decodeBase64
+	
+	
+	;decodeBase64
+	
+	
+	
+	
+	push ax
+	push bx
+	push cx
+	push dx
+	push si
+	push di
+    
 	
 
+    ;loop on every 4 characters in message
+
+    mov al, [byte ptr message+1]
+	xor ah, ah
+    ;ax is the number of characters in message
+	
+	mov bl, 4
+	div bl
+	dec al
+	
+	xor dh, dh
+	xor dl, dl
+	
+	cmp al, 0
+	jne not1IterationDecode
+	inc dh ;dh is 1 if we don't need to run more than once
+	
+not1IterationDecode:
+	;iterate for al
+	
+	;si is index in message (the message to decode)
+	;di is index in decodedMsg
+	xor si, si
+	add si, 2
+	xor di, di
+	
+	cmp al, 0
+	jne decodeBase64Loop
+	
+	add si, 3
+	cmp [byte ptr message+si], '='
+	je exitDecodeBase64Loop	;if there are less than 3 character in the decoded message
+
+
+	sub si, 3
+	
+decodeBase64Loop:
+	mov bx, di
+	mov cx, si
+	mov bh, cl
+	
+	
+	push bx
+	
+	call decode3BytesBase64
+	
+	add di, 3
+	add si, 4
+	
+	cmp dh, 1
+	je exitDecodeBase64Loop
+
+	
+	dec al
+	cmp al, 0
+	ja decodeBase64Loop
+
+exitDecodeBase64Loop:
+
+	cmp [byte ptr message+si], '=' ;this can't happen if we ran in the loop cuz it can only be in the last 2 bytes
+	jne moreThan3CharsDecode
+	sub si, 3
+	dec dh
+	
+moreThan3CharsDecode:
+	
+	;end loop
+	xor cl, cl
+	inc cl
+	
+	cmp dh, 1
+	jne not1IterationDecode2
+	
+	dec cl
+	jmp endDecodeBase64Stop1
+	
+not1IterationDecode2:
+	
+	
+	;we've got 4 characters left in message
+	
+	add si, 2
+	cmp [byte ptr message+si], '='
+	
+	jne Not2EqualSigns
+	
+	;we've got == at the end
+	
+	sub si, 2
+	mov dl, [byte ptr message+si]
+	xor dh, dh
+	push dx
+	call redoCharArrayBase64
+	mov dl, [charIndex]
+	shl dl, 2
+	
+	inc si
+	mov bl, [byte ptr message+si]
+	xor bh, bh
+	push bx
+	call redoCharArrayBase64
+	mov dh, [charIndex]
+	shr dh, 4
+	add dl, dh
+	mov [byte ptr decodedMsg+di], dl
+	inc di
+	
+	dec di
+	dec si
+	;end function for ==
+	jmp endDecodeBase64
+	
+	
+Not2EqualSigns:
+	inc si
+	cmp [byte ptr message+si], '='
+	jne not1EqualSign
+	
+	;we've got = at the end so 2 bytes to decode
+	
+	sub si, 3
+	mov dl, [byte ptr message+si]
+	xor dh, dh
+	push dx
+	call redoCharArrayBase64
+	mov dl, [charIndex]
+	shl dl, 2
+	inc si
+	
+	mov bl, [byte ptr message+si]
+	xor bh,bh
+	push bx
+	call redoCharArrayBase64
+	mov dh, [charIndex]
+	and dh, 00110000b
+	shr dh, 4
+	add dl, dh
+	mov [byte ptr decodedMsg+di], dl
+	inc di
+	
+	;finished first byte
+	
+	
+endDecodeBase64Stop1:
+	cmp cl, 0
+	je endDecodeBase64Stop2
+	
+	
+	
+	mov bl, [byte ptr message+si]
+	inc si
+	xor bh,bh
+	push bx
+	call redoCharArrayBase64
+	mov bh, [charIndex]
+	and bh, 00001111b
+	shl bh, 4
+	
+	mov dl, [byte ptr message+si]
+	xor dh, dh
+	push dx
+	call redoCharArrayBase64
+	mov dl, [charIndex]
+	
+	and dl, 00111100b
+	shr dl, 2
+	add dl, bh
+	
+	mov [byte ptr decodedMsg+di], dl
+	inc di
+	
+
+	jmp endDecodeBase64
+	
+
+
+not1EqualSign:
+	;we've got no = at the end so 3 bytes to decode
+	
+	sub si, 3
+	mov dl, [byte ptr message+si]
+	xor dh, dh
+	push dx
+	call redoCharArrayBase64
+	mov dl, [charIndex]
+	shl dl, 2
+	
+	
+endDecodeBase64Stop2:
+	cmp cl, 0
+	je endDecodeBase64Stop3
+
+	
+	inc si
+	mov bl, [byte ptr message+si]
+	xor bh, bh
+	push bx
+	call redoCharArrayBase64
+	mov dh, [charIndex]
+	shr dh, 4
+	add dl, dh
+	mov [byte ptr decodedMsg+di], dl
+	inc di
+	
+	mov bl, [byte ptr message+si]
+	inc si
+	xor bh,bh
+	push bx
+	call redoCharArrayBase64
+	mov bh, [charIndex]
+	and bh, 00001111b
+	shl bh, 4
+	
+	
+endDecodeBase64Stop3:
+	cmp cl, 0
+	je endDecodeBase64
+	
+	
+	mov dl, [byte ptr message+si]
+	xor dh, dh
+	push dx
+	call redoCharArrayBase64
+	mov dl, [charIndex]
+	
+	and dl, 00111100b
+	shr dl, 2
+	add dl, bh
+	
+	mov [byte ptr decodedMsg+di], dl
+	inc di
+	
+	mov dl, [byte ptr message+si]
+	xor dh,dh
+	push dx
+	call redoCharArrayBase64
+	mov dl, [charIndex]
+	and dl, 00000011b
+	shl dl, 6
+	inc si
+	mov bl, [byte ptr message+si]
+	xor bh, bh
+	push bx
+	call redoCharArrayBase64
+	mov bl, [charIndex]
+	and bl, 00111111b
+	add dl, bl
+	mov [byte ptr decodedMsg+di], dl
+	
+
+	
+	;cleanup
+endDecodeBase64:
+	
+	pop di
+	pop si
+	pop dx
+	pop cx
+	pop bx
+	pop ax
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	
