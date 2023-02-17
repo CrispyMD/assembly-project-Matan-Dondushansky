@@ -48,13 +48,22 @@ DATASEG
 	DecodeText 	db 10,10,'               ','Write a string you will like to decode (max 56 characters)',10,10
 				db '               ','Each character not in the alphabet will not be registered.',10,10
 				db '               ','Press Enter to submit string and backspace to delete a char',10,10
-				db '               ','Press ! to go back to the main menu',10,10,10,10,'$'
+				db '               ','Press ! to go back to the main menu',10,10,10,10
+				db '               ','$'
 				
 				
 	InvalidStringDecodeText	db 10,10,'               ','You submitted an invalid String.',10,10
 							db '               ','Try to write a valid string next time :)',10,10,10,10
 							db '               ','Press M/m to go back to the Main Menu',10,10
 							db '               ','Press D/d to resubmit a string','$'
+							
+							
+	ValidDecodeMsgText1	db 10,10,'               ','Your decoded message is',10,10,10
+						db '               ','$'
+
+
+	ValidDecodeMsgText2 db 10,10,10,10,'               ','Press M/m to go back to the main menu',10,10
+						db '               ','Press D/d to decode another message','$'
 							
 							
 							
@@ -66,6 +75,7 @@ DATASEG
 	base64Alphabet db 64 dup (?)
 	encodedString db 256 dup (?)
 	decodedMsg db 256 dup (?)
+	jumpTo db ? ;E if EncodeMenu, D if DecodeMenu, I if InrtoMenu, M if MainMenu
 	
 CODESEG
 
@@ -951,7 +961,9 @@ start:
 	
 	;Main Menu
 MainMenu:
+	mov [jumpTo], 0
 	xor ch, ch
+	xor cl, cl
 	
 	mov ah, 0 ;text mode
 	mov al, 2
@@ -983,16 +995,31 @@ MainMenuLoop:
 	
 	
 	cmp al, 'E'
-	je EncodeMenu
+	je EncodeMenuStop1
 	cmp al, 'e'
-	je EncodeMenu
+	je EncodeMenuStop1
+	
+	jmp NotEMainMenu
+	
+EncodeMenuStop1:
+	mov [jumpTo], 'E'
+	jmp EncodeMenuStop2
+	
+	
+NotEMainMenu:
 	
 	cmp al, 'D'
-	je DecodeMenu
+	je DecodeMenuStop1
 	cmp al, 'd'
-	je DecodeMenu
+	je DecodeMenuStop1
+
 	
 	jmp MainMenuLoop
+	
+	
+DecodeMenuStop1:
+	mov cl, 1
+	jmp DecodeMenuStop2
 	
 	
 MainMenuStop1:
@@ -1035,6 +1062,15 @@ IntroMenuLoop:
 	je MainMenu
 	
 	jmp IntroMenuLoop
+	
+DecodeMenuStop2:
+	cmp cl, 1
+	je DecodeMenu
+	
+	
+EncodeMenuStop2:
+	cmp [jumpTo], 'E'
+	je EncodeMenu
 	
 	
 IntroEncode:
@@ -1095,6 +1131,13 @@ MainMenuStop2:
 EncodeMenu:
 
 DecodeMenu:
+
+	mov ax, 3
+	int 10h
+	
+	mov ah, 9
+	mov dx, offset DecodeText
+	int 21h
 	
 	mov si, 2
 	;si is the index in message
@@ -1108,38 +1151,67 @@ DecodeMenuLoop:
 	int 16h
 	
 	cmp al, '!'
-	jne GoToMain1
+	jne NotGoToMain1
 	
 	mov ch, 1
 	jmp MainMenuStop2
 	
-GoToMain1:
-	
+NotGoToMain1:
 	xor ah, ah
 	push ax
 	call checkInAlphabet
+	
+	
 	;if ah is 0 then avoid the char
 	cmp ah, 1
 	je ValidCharDecode
 	
+	cmp al, '='
+	je ValidCharDecode
+	
 	;check for enter
 	
-	cmp al, 10 ;enter
+	cmp al, 0dh ;enter
 	je DecodeMessage
 	
 	;check for backspace
 
-	cmp al, 8
+	cmp al, 8 ;backspace
 	jne DecodeMenuLoop
 	
-	cmp si, 2
-	je DecodeMenuLoop
+	cmp [byte ptr message+1], 0
+	je DecodeMenuLoop ;if there are no chars in message
 	
 	dec si
 	dec [byte ptr message+1]
 	
 	
+	;print message
+	mov ax, 3
+	int 10h
+	
+	mov ah, 9
+	mov dx, offset DecodeText
+	int 21h
+	
+	mov [byte ptr message+si], '$'
+	
+	mov dx, offset message
+	;add dx, 2
+	mov ah, 9h
+	int 21h
+	
 	jmp DecodeMenuLoop
+	
+MainMenuStop4:
+	cmp ch, 1
+	je MainMenuStop2
+	
+	;end porgram for backspace
+	
+DecodeMenuStop4:
+	cmp [jumpTo], 'D'
+	je DecodeMenu
 	
 	
 	;char is valid
@@ -1149,17 +1221,35 @@ ValidCharDecode:
 	;if not backspace (8 in ascii)
 	cmp [byte ptr message+1], 56
 	je DecodeMenuLoop
+	
 
 	inc [byte ptr message+1]
 	mov [byte ptr message+si], al
 	inc si
+	
+	;print message
+	mov ax, 3
+	int 10h
+	
+	mov ah, 9
+	mov dx, offset DecodeText
+	int 21h
+	
+	
+	mov [byte ptr message+si], '$'
+	
+	
+	mov dx, offset message
+	;add dx, 2
+	mov ah, 9h
+	int 21h
 	
 	jmp DecodeMenuLoop
 	
 	
 MainMenuStop3:
 	cmp ch, 1
-	je MainMenuStop2
+	je MainMenuStop4
 	
 DecodeMessage:
 	
@@ -1169,6 +1259,48 @@ DecodeMessage:
 	cmp cl, 0
 	je InvalidStringDecode
 	
+	
+	
+	
+	
+	;valid string
+	;print decoded string
+	
+	mov ax, 3
+	int 19h
+	
+	mov ah, 9
+	mov dx, offset ValidDecodeMsgText1
+	int 21h
+	
+	mov ah, 9
+	mov dx, offset decodedMsg
+	int 21h
+	
+	mov ah, 9
+	mov dx, offset ValidDecodeMsgText2
+	int 21h
+	
+	
+	
+ValidStringDecodeLoop:
+	mov ah, 0h
+	int 16h
+	
+	
+	cmp al, 'd'
+	je DecodeMenuStop3
+
+	cmp al, 'D'
+	je DecodeMenuStop3
+	
+	cmp al, 'M'
+	je MainMenuStop4
+	
+	cmp al, 'm'
+	je MainMenuStop4
+	
+	jmp ValidStringDecodeLoop
 	
 	
 	
@@ -1189,10 +1321,39 @@ InvalidStringDecode:
 	mov dx, offset InvalidStringDecodeText
 	int 21h
 	
+InvalidStringDecodeLoop:
 	mov ah, 0h
 	int 16h
 	
-	cmp al, 
+	
+	cmp al, 'd'
+	je DecodeMenuStop3
+
+	cmp al, 'D'
+	je DecodeMenuStop3
+	
+	jmp NotDecodeMenuStop3
+	
+DecodeMenuStop3:
+	mov [jumpTo], 'D'
+	jmp DecodeMenuStop4
+	
+NotDecodeMenuStop3:
+	
+	
+	cmp al, 'm'
+	je InvalidStringDecodeBackToMain
+	
+	cmp al, 'M'
+	je InvalidStringDecodeBackToMain
+	
+InvalidStringDecodeBackToMain:
+	mov ch, 1
+	jmp MainMenuStop3
+	
+	
+	
+	jmp InvalidStringDecodeLoop
 	
 	
 exit:
