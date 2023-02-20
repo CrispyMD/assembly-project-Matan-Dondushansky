@@ -151,6 +151,7 @@ proc encodeBase64
 	;encode the string stored in message and put the encoded version in encodedString
 	;loop on every 3 bytes and send them to encode3BytesBase64, then for the last 3 (if not 3) encode manually
 	;10,13,'$' will be appended to the message
+	
 	push ax
 	push bx
 	push cx
@@ -282,7 +283,7 @@ jmp endEncodeBase64
 
 endEncodeBase64pause:
 	cmp ah, 0
-	je endEncodeBase64 ;if there are no more bytes to encode
+	je endEncodeBase64Semi ;if there are no more bytes to encode
 	
 	
 	
@@ -334,8 +335,24 @@ bytesRemaining2Base64Encode:
 	inc di
 	
 	
+	
+	
+	
 endEncodeBase64:
+	mov [byte ptr encodedString+di], '$' ;if we didnt skip on the last level
+	jmp endEndEncodeBase64
+	
+	
+endEncodeBase64Semi:
+	inc al
+	add al, al
+	add al, al
+	xor ah, ah
+	mov di, ax
 	mov [byte ptr encodedString+di], '$'
+	
+	
+endEndEncodeBase64:
 	
 	pop di
 	pop si
@@ -343,7 +360,6 @@ endEncodeBase64:
 	pop cx
 	pop bx
 	pop ax
-	
 
 	ret
 endp encodeBase64
@@ -482,6 +498,9 @@ proc decodeBase64
     mov al, [byte ptr message+1]
 	xor ah, ah
     ;ax is the number of characters in message
+	
+	
+	
 	
 	mov bl, 4
 	div bl
@@ -1270,7 +1289,9 @@ EncodeMessage:
 	cmp [byte ptr message+1], 0
 	je EncodeMenuLoop
 
+
 	call encodeBase64
+	
 	
 	mov ax, 3
 	int 10h
@@ -1458,8 +1479,17 @@ DecodeMessage:
 	jmp DecodeMenuLoopStop1
 	
 NotDecodeMenuLoopStop1:
+
+	mov al, [byte ptr message+1]
+	mov dl, 4
+	div dl
+	cmp ah, 0
+	jne InvalidStringDecode
+	
+	
 	
 	call decodeBase64
+	
 	;check for exceptions
 	call checkValidDecode
 	cmp di, 0
