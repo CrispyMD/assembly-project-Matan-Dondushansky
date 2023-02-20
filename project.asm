@@ -1267,6 +1267,9 @@ PrintEncode:
 	
 	
 EncodeMessage:
+	cmp [byte ptr message+1], 0
+	je EncodeMenuLoop
+
 	call encodeBase64
 	
 	mov ax, 3
@@ -1335,6 +1338,7 @@ DecodeMenu:
 	
 	mov [byte ptr message], 56
 DecodeMenuLoop:
+	mov [jumpTo], 0
 
 	mov ah, 0h
 	int 16h
@@ -1387,8 +1391,9 @@ NotGoToMain1:
 	
 	mov dx, offset message
 	add dx, 2
-	mov ah, 9h
 	int 21h
+	
+	
 	
 	jmp DecodeMenuLoop
 	
@@ -1404,6 +1409,10 @@ DecodeMenuStop4:
 	
 	
 	;char is valid
+	
+DecodeMenuLoopStop1:
+	cmp [jumpTo], 'X'
+	je DecodeMenuLoop
 
 notBsDecode:
 ValidCharDecode:
@@ -1441,6 +1450,14 @@ MainMenuStop3:
 	je MainMenuStop4
 	
 DecodeMessage:
+	
+	cmp [byte ptr message+1], 0
+	jne NotDecodeMenuLoopStop1
+	
+	mov [jumpTo], 'X'
+	jmp DecodeMenuLoopStop1
+	
+NotDecodeMenuLoopStop1:
 	
 	call decodeBase64
 	;check for exceptions
